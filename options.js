@@ -40,7 +40,37 @@ function save_options() {
   displayStatus("Options Saved.", 750);
 
   chrome.runtime.sendMessage({greeting: "reloadprefs"}, function(response) { });
+
+  saveToChromeSyncStorage()
 }
+
+function chromeStorageSaveALocalStor(tosave){
+	storage.set(tosave, function() {
+		if(chrome.runtime.lastError && chrome.runtime.lastError.message.indexOf('MAX_WRITE_OPERATIONS_PER_HOUR') > 0){
+			//console.log(chrome.runtime.lastError);
+		}
+	});
+}
+
+function saveSyncItemsToChromeSyncStorage(){
+	var tosave={};
+	for(var i in pSyncItems){
+		tosave[i]=localStorage[i];
+	}
+	chromeStorageSaveALocalStor(tosave);
+	sendReloadPrefs();
+}
+function saveToChromeSyncStorage(){
+	var tosave={};
+	for(var i in pOptions){
+		tosave[i]=localStorage[i];
+	}
+	for(var i in pAdvOptions){
+		tosave[i]=localStorage[i];
+	}
+	chromeStorageSaveALocalStor(tosave);
+}
+
 
 function reset_options() {
 	for( i in pOptions){
@@ -138,7 +168,7 @@ function createOptions(piOptions, elemAppend){
 			cb.setAttribute('id',i);
 			if(piOptions[i].ind>0)l.appendChild(document.createTextNode('\u00a0\u00a0\u00a0\u00a0'));
 			if(piOptions[i].ind>1)l.appendChild(document.createTextNode('\u00a0\u00a0\u00a0\u00a0'));
-			l.appendChild(document.createTextNode(piOptions[i].name));
+			l.appendChild(document.createTextNode(piOptions[i].name+' '));
 			l.appendChild(cb);
 			
 			

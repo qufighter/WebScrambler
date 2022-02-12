@@ -5,22 +5,14 @@ var observer=null;
 var textNodeBackupProp = 'alt'; // text nodes don't have many (if any!) assignable dom-persisted properties... even alt has many exclusions it seems (within code or pre, does not work)
 
 var scrambleText = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-while( scrambleText.length < 65535 ){
-	scrambleText += scrambleText;
-}
+// while( scrambleText.length < 65535 ){
+// 	scrambleText += scrambleText;
+// }
 var scrambleTextLC = scrambleText.toLowerCase()
 var mutationList = [];
 
 var active=true;
 
-function canCheckForChildText(node){
-	return node.childNodes.length > 0 && node.nodeName != 'SCRIPT' && node.nodeName != 'STYLE';
-}
-
-var imageLikeNodesSelector = 'img,image,video';
-function isImageLikeNode(node){
-	return node.nodeType == 1 && (node.nodeName == 'IMG' || node.nodeName == 'image' || node.nodeName == 'VIDEO' )
-}
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 	//var m, i, l;
@@ -37,7 +29,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 			active=false;
 		}
 	}else{
-		console.log('unhandled message', request);
+		console.log('webscrambler::unhandled message', request);
 	}
 });
 
@@ -46,17 +38,16 @@ function restoreAllNodes(){
 	for( var i=0,l=nodes.length; i<l; i++ ){
 		nodes[i].removeAttribute('web-scrambler-skip');
 		nodes[i].removeAttribute('web-scrambler-hover');
-		bodyMouseOver({target:nodes[i]}) // todo: fix function to no longer need faux event wrapper; TODO: in case of trigger from here (non event) we don't want to add those "strange" state attributes (eg web-scrambler-hover)
+		unscrambleNode(nodes[i], null);
 	}
 }
 function restoreVpNodes(){
 	var nodes=document.body.querySelectorAll('*');
-	//var vpNodes = []''
 	for( var i=0,l=nodes.length; i<l; i++ ){
 		var rect=nodes[i].getBoundingClientRect();
+		// filter for viewport nodes...
 		if( !(rect.x /*+ rect.width*/ < 0 || rect.y /*+ rect.height*/ < 0 || rect.x > window.innerWidth || rect.y > window.innerHeight) ){
-			//vpNodes.push(nodes[i];)
-			bodyMouseOver({target:nodes[i]}); // todo: fix function to no longer need faux event wrapper; TODO: in case of trigger from here (non event) we don't want to add those "strange" state attributes (eg web-scrambler-hover)
+			unscrambleNode(nodes[i], null);
 			nodes[i].setAttribute('web-scrambler-skip', 'on') // TODO: fix so that this does not impact TOP LEVEL NODES (eg nodes that contain the entire viewport area), temp fix was to remove +rect.width etc above... could use "predominantly in vp" calc... or maybe require vp height is > than element height
 		}
 	}
@@ -76,14 +67,16 @@ function checkForNodes(){
 
 		mutationList.forEach(function(v){
 			if( v.type == 'childList'){
-				if( !nodeOrAnyParentDoNotRecurseInto(v.target) ){ // todo: also ANY parent of this might be a bad parent.. unfortunately we have to check!!
-					nodes.concat(v.addedNodes);
-				}
-				if( v.addedNodes.length < 1 ){
-					console.log('111111DEBUGGY!', v);
+				if( !nodeOrAnyParentDoNotRecurseInto(v.target) ){
+					if( v.addedNodes.length ){
+						nodes.concat(v.addedNodes);
+					}else{
+						nodes.push(v.target);
+						//console.log('webscrambler::mutationList:: empty v.addedNodes for childList!', v);
+					}
 				}
 			}else{
-				console.log('2222DEBUGGY!', v);
+				console.log('webscrambler::mutationList:: unhandled v.type!', v);
 				nodes.push(v.target);
 			}
 		})
@@ -93,42 +86,48 @@ function checkForNodes(){
 		//console.log('SHOULD "NEVER" REACH HERE!!');
 		nodes=document.body.querySelectorAll('*');
 	}
-	processNodes(nodes);
+	processNodes(nodes, null);
 }
 
 function nodeOrAnyParentDoNotRecurseInto(node){
 	var result = false; // if we reach the top (null) we will keep the result ( do recurse into/we are within an OK node )
-
 	while(node && !doNoRecurseIntoNode(node) ){
 		node = node.parentNode;
 	}
-
 	if( node != null ){
 		result = true; // we didn't reach the top;
 		//console.log('top not reached!!', node)
 	}
-
 	return result;
 }
 
 function doNoRecurseIntoNode(node){
 	// keep this safe for document where some functions (eg node.getAttribute) will not be available....
-	return node.nodeName == 'PRE' || node.nodeName == 'CODE' || (node.getAttribute && (node.getAttribute('contenteditable') || node.getAttribute('web-scrambler-skip'))) || node.nodeName == 'TEXTAREA';
+	var nn = node.nodeName.toUpperCase();
+	return nn == 'PRE' || nn == 'CODE' || nn == 'TEXTAREA' || (node.getAttribute && (node.getAttribute('contenteditable') || node.getAttribute('web-scrambler-skip')));
 }
 
-function processNodes(nodes){
+function canCheckForChildText(node){
+	return node.childNodes.length > 0 && node.nodeName != 'SCRIPT' && node.nodeName != 'STYLE';
+}
+
+var imageLikeNodesSelector = 'img,image,video';
+function isImageLikeNode(node){
+	var nn = node.nodeName.toUpperCase();
+	return node.nodeType == 1 && (nn == 'IMG' || nn == 'IMAGE' || nn == 'VIDEO' )
+}
+
+function processNodes(nodes, modeIsUnscramble, isHover){
+
+
+	var scramblerOrUnscrambler = modeIsUnscramble ? unscrambleNode : scrambleNode;
 
 	for( var i=0,l=nodes.length; i<l; i++ ){
 
 		var badParent = null;
-
-		// we'd have to find a way to skip children of the above too... interesting?? tricky??? 
-		// any child of contenteditable="true"
-		// any textarea's children
-		//etc!!!
-		// -> in practice, the ordering is already recursive, such that if the parent node matches on the next subsequent node we can keep moving until we find a new parentNode
-		// -> this patern may only work for querySelectAll results... and not for mutation lists... 
-		while( i<l && doNoRecurseIntoNode(nodes[i]) ) { //continue; // SKIPITY DO DA
+		// must avoid certain nodes being scrambled (textare, etc) which make it impossible to interact with the web... or read the code, etc
+		// -> this patern may only work for querySelectAll results... and not for mutation lists... which are actually enforced above by nodeOrAnyParentDoNotRecurseInto
+		while( i<l && doNoRecurseIntoNode(nodes[i]) ) {
 			badParent = nodes[i];
 			i++;
 			while( i<l && nodes[i].parentNode == badParent ){
@@ -138,21 +137,9 @@ function processNodes(nodes){
 		}
 		if(! (i<l))break;
 
-		bodyMouseOut({target:nodes[i]}) // todo: fix function to no longer need faux event wrapper
-
-		// if( nodes[i].nodeType == 3 ){
-		// 	scrambleTextNode(nodes[i]); // the query will NEVER return text nodes here (at top level)
-		// }else if( isImageLikeNode(nodes[i]) ){
-		// 	scrambleImage(nodes[i]);
-
-		// }else{
-		// 	if( canCheckForChildText(nodes[i]) ){ // check 1 deep for text nodes!
-		// 		applyForChildNodes(nodes[i], scrambleIfTextNode);
-		// 	}
-		// }
+		scramblerOrUnscrambler(nodes[i], isHover);
+		//bodyMouseOut({target:nodes[i]}) 
 	}
-
-
 }
 
 function reverseChars(str){
@@ -160,31 +147,88 @@ function reverseChars(str){
 }
 
 function sortChars(str){
-	return str.split('').sort().join('');
+	return str.split('').sort(sortAlgos[opts.sortAlgo] || undefined).join('');
+}
+
+function sortCharsForced(str){
+	var ostring = str;
+	var result = sortChars(str);
+	if( result == ostring ){
+		//result = scrambleText.substr(0, ostring.length);
+		result = scrambleTextLC.split('').sort(sortAlgos.random).join('').substr(0, ostring.length);
+	}
+	// while( result.length > 1 && result == ostring ){
+	// 	if( result.length < 3 ){
+	// 		result = reverseChars(ostring)+'ZZZ'; // will not work, what about anagrams?
+	// 	}else{
+	// 		break;
+	// 		//result = ostring.split('').sort(sortAlgos.random).join(''); // foor short word lengths, this is teribad... and also broken for anagrams
+	// 	}
+	// }
+	return result;
+}
+
+var sortAlgos = {
+	default: undefined,
+	standard: function(a,b){
+		return a.localeCompare(b);
+	},
+	standardReversed: function(a,b){
+		return -sortAlgos.standard(a,b);
+	},
+	caseInsensitive: function(a,b){
+		return a.toLocaleLowerCase().localeCompare(b.toLocaleLowerCase());
+	},
+	caseInsensitiveReversed: function(a,b){
+		return -sortAlgos.caseInsensitive(a,b);
+	},
+	random: function(a,b){
+		return Math.random() < 0.5 ? 1 : -1;
+	}
 }
 
 function scrambleTextNode(t){
+	// many possible obfucscation strategies and preferences may be added here later... scrambleText is not availble currently though!  plus using random text messes up font printing, using existing text is better...
 	//var tl = t.nodeValue.length;
 	//if( tl > 3 ){ // short words filter...
 		//t.nodeValue = scrambleText.substr(0, tl);
 
 		//t.nodeValue = t.nodeValue.replace(/\w/ig, scrambleText)
 
+		var minLenOpt = opts.minLength - 0;
+		var sortHandler = opts.forceObfuscation ? sortCharsForced : sortChars;
+
 		if( !t[textNodeBackupProp] ){
-			t[textNodeBackupProp] = t.nodeValue;
+			t[textNodeBackupProp] = 'webscramble::'+t.nodeValue;
 		}else{
 			// ALREADY SCRAMBLED!! WATCH OUT!!!
 			// console.log("NOISY NOISY NOISE!@!!!")
-			//return; // ruins unscramble featuer...
+			if( t[textNodeBackupProp].substr(0,11) == 'webscramble' ){
+				// already scrambled???? (maybe only 90% sure...)
+				return; // ruins unscramble featuere... for sites that will change our value? (maybe they reset the text but leave alt intact...)
+			}
 		}
 
-		// t.nodeValue = t.nodeValue.replace(/[A-Z]+/g, function(v){return reverseChars(v);})
-		// t.nodeValue = t.nodeValue.replace(/[a-z]+/g, function(v){return reverseChars(v);})
-		t.nodeValue = t.nodeValue.replace(/\w+/g, function(v){return v.length > 3 ? reverseChars(v) : v;})
+		if( opts.obfuscateMode == 'sort-cased-chars' ){
+			// marked with *, nominally slower...
+			t.nodeValue = t.nodeValue.replace(/[A-Z]+/g, function(v){return v.length > minLenOpt ? sortHandler(v) : v;})
+			t.nodeValue = t.nodeValue.replace(/[a-z]+/g, function(v){return v.length > minLenOpt ? sortHandler(v) : v;})
 
+		}else if( opts.obfuscateMode == 'sort-words' ){
+			t.nodeValue = t.nodeValue.replace(/\w+/g, function(v){return v.length > minLenOpt ? sortHandler(v) : v;})
 
-		// t.nodeValue = t.nodeValue.replace(/[A-Z]+/g, function(v){return sortChars(v);})
-		// t.nodeValue = t.nodeValue.replace(/[a-z]+/g, function(v){return sortChars(v);})
+		}else if( opts.obfuscateMode == 'reverse-cases' ){
+			t.nodeValue = t.nodeValue.replace(/[A-Z]+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
+			t.nodeValue = t.nodeValue.replace(/[a-z]+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
+
+		}else /*if( opts.obfuscateMode == 'reverse-words' )*/{
+			t.nodeValue = t.nodeValue.replace(/\w+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
+		}
+
+		// if( opts.forceObfuscation ){
+		// 	//todo: detect obfuscation failures here (for words that exceeded the minLenOpt)...
+		// 	// actually not trival, we would want to detect this above somehow... would work here easily IF the element/paragraph only contained one non obfuscated word...
+		// }
 
 
 		// t.nodeValue = t.nodeValue.replace(/[A-Z]+/g, function(v){return scrambleText.substr(0, v.length);})
@@ -193,8 +237,9 @@ function scrambleTextNode(t){
 	//}
 }
 function unscrambleTextNode(t){
-	if( t[textNodeBackupProp] && t[textNodeBackupProp].length > 0 ){
-		t.nodeValue = t[textNodeBackupProp];
+	if( t[textNodeBackupProp] && t[textNodeBackupProp].length > 0 && t[textNodeBackupProp].substr(0,11) == 'webscramble' ){
+		t.nodeValue = t[textNodeBackupProp].substr(13);
+		t[textNodeBackupProp] = '';
 	}
 }
 
@@ -211,27 +256,17 @@ function unscrambleIfTextNode(t){
 
 function scrambleImage(i){
 	if(i.getAttribute('web-scrambler-hover')){
-		console.log('web scrambler cancled scramble operation due to hover detected...');
+		//console.log('webscrambler:: canceled scramble operation due to hover detected...');
 		return;
 	}
 	i.style.opacity=0.1;
 	i.style.filter='brightness(0.4)';
 }
 
-
 function unscrambleImage(i){
 	// odd bug, if we are hovered and mutate again.... the image is scrambled again... annoying virtual doms!
 	i.style.opacity='';
 	i.style.filter='';
-}
-
-// deprecated
-function hoverImage(e){
-	unscrambleImage(e.target);
-}
-// deprecated
-function unhoverImage(e){
-	scrambleImage(e.target);
 }
 
 function applyForChildNodes(parent, fnApply){
@@ -240,52 +275,71 @@ function applyForChildNodes(parent, fnApply){
 	}
 }
 
-function bodyMouseOver(e){
-		if(!active) return; // todo: remove listeners instead?
-
-
-	if( isImageLikeNode(e.target) ){ // possibly, we need to recurse child nodes here?? or we need to attach events to each node... hmm
-		unscrambleImage(e.target);
-		e.target.setAttribute('web-scrambler-hover', 'on'); // event mode only.... (like below) ?
-	}else if( e.target.nodeType == 3){
-		unscrambleTextNode(e.target); // never happens...
-	}else if( canCheckForChildText(e.target) ){
-		applyForChildNodes(e.target, unscrambleIfTextNode);
+function unscrambleNode(n, isHover, processChildNodes){
+	if( isImageLikeNode(n) ){ // possibly, we need to recurse child nodes here?? or we need to attach events to each node... hmm
+		unscrambleImage(n);
+		if( isHover ){
+			n.setAttribute('web-scrambler-hover', 'on'); // event mode only.... 
+		}
+	}else if( n.nodeType == 3){
+		unscrambleTextNode(n); // never happens...
+	}else if( canCheckForChildText(n) ){
+		applyForChildNodes(n, unscrambleIfTextNode);
 	}
+}
 
+function scrambleNode(n, isUnHover, processChildNodes){
+	if( nodeOrAnyParentDoNotRecurseInto(n) ) return;
 
-	// thijs first part only in event listener (future split of funciton to remove e.target)
-	//if( e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
-		processNodes(e.target.querySelectorAll(imageLikeNodesSelector));
-	//}
+	if( isImageLikeNode(n) ){
+		n.removeAttribute('web-scrambler-hover');
+		scrambleImage(n);
+	}else if( n.nodeType == 3){
+		scrambleTextNode(n); // never happens...
+	}else if( canCheckForChildText(n) ){
+		applyForChildNodes(n, scrambleIfTextNode);
+	}
+}
+
+function bodyMouseOver(e){
+	if(!active) return; // todo: remove listeners instead?
+	unscrambleNode(e.target, 'isHover');
+
+	//console.log('webscramber::mmouseovervent', e)
+
+	 // if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
+		// processNodes(e.target.querySelectorAll(imageLikeNodesSelector), 'modeIsUnscramble', 'isHover'); // event mode only.... 
+	 // }
 }
 function bodyMouseOut(e){
-		if(!active) return; // todo: remove listeners instead?
+	if(!active) return; // todo: remove listeners instead?
+	scrambleNode(e.target, 'isUnHover');
 
-	if( nodeOrAnyParentDoNotRecurseInto(e.target) ) return;
+	//console.log('webscramber::mmouseoutevent', e)
 
-	if( isImageLikeNode(e.target) ){
-		e.target.removeAttribute('web-scrambler-hover');
-		scrambleImage(e.target);
-	}else if( e.target.nodeType == 3){
-		scrambleTextNode(e.target); // never happens...
-	}else if( canCheckForChildText(e.target) ){
-		applyForChildNodes(e.target, scrambleIfTextNode);
-	}
+	// if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
+	// 	processNodes(e.target.querySelectorAll(imageLikeNodesSelector), null); // event mode only.... 
+	// }
 }
 
+// deprecated, use above
+function hoverImage(e){
+	unscrambleImage(e.target);
+}
+// deprecated, use above
+function unhoverImage(e){
+	scrambleImage(e.target);
+}
 
 function nodeInserted(e){
 	if(!active) return;
 	//console.log('inserted event', e);
-
+	// really odd, tryingt not use a global here SEEMS to break everything???? (maybe just dumb)
+	//checkForNodes([].concat(e)); // rate limit built in?
+	//checkForNodes(Array.prototype.slice.call(e)); // rate limit built in?
 	mutationList.concat(e);
-
-	// clearTimeout(chkForNodesTimeout);
-	// chkForNodesTimeout=setTimeout(checkForNodes,250);
-	checkForNodes(); // rate limit built in?
+	checkForNodes();
 }
-observer = new MutationObserver(nodeInserted)
 
 function checkDocBody(){
 	if( document.body ){
@@ -301,10 +355,15 @@ function docBodyReady(){
 		processNodes(document.body.querySelectorAll('*'));
 	}, 0);
 
-	document.body.addEventListener('mouseover', bodyMouseOver);
-	document.body.addEventListener('mouseout', bodyMouseOut);
+	document.body.addEventListener('mouseover', bodyMouseOver, true);
+	document.body.addEventListener('mouseout', bodyMouseOut, true);
 }
 
-checkDocBody()
+observer = new MutationObserver(nodeInserted)
+//checkDocBody()
 
-
+var opts = {};
+loadPrefsFromStorage(opts, function(){
+	console.log('webscrambler::prefs', opts)
+	checkDocBody()
+});
