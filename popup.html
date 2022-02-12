@@ -1,0 +1,116 @@
+<html>
+<head>
+	<style>
+		body{
+			position:relative;
+			font-family:arial,sans-serif;
+			font-size:12px;
+			margin:4px 4px 4px 4px;
+			padding:0px;
+			text-align:center;
+			-webkit-user-select:none;
+			background-color:#FBFBFB;
+		}
+		body.fixed-popup-size{
+			min-width:250px;
+			min-height:200px;
+			overflow: hidden;
+		}
+		.vs{
+			font-weight:bold;font-size:1.1em;
+			border-bottom:3px solid grey;
+			white-space: nowrap;
+		}
+		a{color:blue;}
+		#miniscreen{
+			position:relative;
+			overflow:hidden;
+			width:50px;height:50px;
+			border:2px solid #449;
+		}
+		#msbox{
+			position:relative;
+		}
+		#minican{
+			width:50px;height:50px;
+			position:absolute;
+			z-index:-50;
+			top:2px;left:2px;
+		}
+		#scrollhold{
+			position:absolute;
+			top:0px;right:0px;
+			width:10px;
+			margin:2px 2px 0px 0px;
+			z-index:999;
+		}
+		#scrolldrag{
+			position:absolute;
+			background-color:grey;
+			z-index:0;
+			opacity:0.8;
+		}
+		.video{
+			position:absolute;
+			box-shadow: 0px 0px 3px 2px #44F inset, 0px 0px 3px 1px #44F;
+			background-color:rgba(64,64,255,0.5);
+			z-index:50 !important;
+			cursor:lock;
+			cursor:move;
+		}
+		.videofixed{
+			position:absolute;
+			box-shadow: 0px 0px 3px 2px orange inset, 0px 0px 3px 1px orange;
+			background-color:rgba(255,192,0,0.5);
+			z-index:100;
+			/*box-shadow:#A46A00 2px 2px 2px;*/
+			cursor:move;
+		}
+		.wsnowrap{
+			white-space:nowrap;
+		}
+		.resize-se{
+			cursor:se-resize;
+			width:10px;
+			height:10px;
+			background-color:orange;
+			position:absolute;
+			bottom:0px;right:0px;
+		}
+		.video .resize-se{display:none}
+		#contextMenu{
+			z-index:9999;
+			border-top:1px solid grey;
+			background-color:white;
+		}
+		#contextMenu a{
+			display:block;
+			cursor:hand;
+		}
+		.rowa{
+			display:block;
+			cursor:pointer;
+			border:1px solid grey;
+			border-top:none;
+			padding:0px 3px 0px 3px;
+		}
+		#contextMenu a:hover{
+			background-color:#AAA;
+		}
+		#helptxt{display:none;}
+	</style>
+  <script src="Cr.js"></script>
+  <script src="opt_prefs.js"></script>
+  <script src="popup.js"></script>
+  <title>Popup</title>
+</head>
+<body>
+	<div class="vs" id="vs">Web Scrambler</div>
+	<div id="ve">
+
+
+
+	</div>
+	<a href="options.html" target="_blank">Options</a>
+</body>
+</html>

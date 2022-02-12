@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+  "description": "The see nothing tool for safe internet usage.",
+  "name": "Web Scrambler",
+  "content_scripts": [ {
+     "js": [ "Cr.js", "opt_prefs.js",  "webscrambler.user.js" ],
+     "run_at": "document_start",
+     "all_frames": true,
+     "matches": [ "<all_urls>" ]
+  }],
+  "browser_action": {
+     "default_icon": {
+       "19": "images/icon19.png",
+       "38": "images/icon38.png"
+     },
+     "default_title": "Web Scrambler",
+     "default_popup": "popup.html"
+   },
+  "options_page": "options.html",
+  "icons": { "16": "images/icon16.png",
+          "32": "images/icon32.png",
+          "48": "images/icon48.png",
+          "64": "images/icon64.png",
+         "128": "images/icon128.png" },
+  "web_accessible_resources": [
+    "webscrambler.user.css"
+  ],
+  "permissions": [
+         "<all_urls>","activeTab","storage"
+       ],
+  "version": "0.0.1.0"
+}
