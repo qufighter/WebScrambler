@@ -2,6 +2,7 @@
 
 var chkForNodesTimeout=0;
 var observer=null;
+var attrObserver=null;
 var textNodeBackupProp = 'alt'; // text nodes don't have many (if any!) assignable dom-persisted properties... even alt has many exclusions it seems (within code or pre, does not work)
 
 var scrambleText = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -12,6 +13,32 @@ var scrambleTextLC = scrambleText.toLowerCase()
 var mutationList = [];
 
 var active=true;
+
+var imageCssPropsWeModify={'opacity':'o', 'filter':'f' }; // still doesnt' work if opacity is dynaically set along the way (say, once image loads)... we may need to observe attribute modifications to the DOM too!
+
+
+function getCssPropsWeModify(node, propsList){
+	var robj={};
+	var prop, propShortKey;
+	for( prop in propsList ){
+		robj[propsList[prop]] = node.style[prop];
+	}
+	return robj;
+}
+
+function resetPropertiesFromSource(validNode, sourceAttribute, propsList){
+	var origProps=JSON.parse(validNode.getAttribute(sourceAttribute)) || false;
+	var prop, propShortKey;
+	for( prop in propsList ){
+		propShortKey = propsList[prop];
+		if( typeof origProps[propShortKey] != 'undefined' ) validNode.style[prop] = origProps[propShortKey];
+	}
+}
+
+function resetOrigionalProperties(validNode, propsList){
+	resetPropertiesFromSource(validNode, "webscramblerorigprops", propsList);
+	validNode.removeAttribute("webscramblerorigprops");
+}
 
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
@@ -69,9 +96,15 @@ function checkForNodes(){
 			if( v.type == 'childList'){
 				if( !nodeOrAnyParentDoNotRecurseInto(v.target) ){
 					if( v.addedNodes.length ){
-						nodes.concat(v.addedNodes);
+						
+						// nodes.concat(v.addedNodes);
+						v.addedNodes.forEachf(function(an){
+							nodes.push(an);
+							//nodes.concat(an.querySelectorAll('*')); // really not sure if this is needed or not... maybe!
+						});
 					}else{
 						nodes.push(v.target);
+						//nodes.concat(v.target.querySelectorAll('*')); // really not sure if this is needed or not... maybe!
 						//console.log('webscrambler::mutationList:: empty v.addedNodes for childList!', v);
 					}
 				}
@@ -104,7 +137,7 @@ function nodeOrAnyParentDoNotRecurseInto(node){
 function doNoRecurseIntoNode(node){
 	// keep this safe for document where some functions (eg node.getAttribute) will not be available....
 	var nn = node.nodeName.toUpperCase();
-	return nn == 'PRE' || nn == 'CODE' || nn == 'TEXTAREA' || (node.getAttribute && (node.getAttribute('contenteditable') || node.getAttribute('web-scrambler-skip')));
+	return nn == 'PRE' || nn == 'CODE' || nn == 'TEXTAREA' || nn == 'SVG' || nn == 'SELECT' || nn == 'OPTION' || (node.getAttribute && (node.getAttribute('contenteditable') || node.getAttribute('web-scrambler-skip')));
 }
 
 function canCheckForChildText(node){
@@ -195,6 +228,8 @@ function scrambleTextNode(t){
 
 		//t.nodeValue = t.nodeValue.replace(/\w/ig, scrambleText)
 
+		if( t.nodeValue.substr(0,1) == '$' ) return; // TODO: new cateogry of exclusions for currency values where obfuscation is downright awesomely annoying... configure regex for additional exclusions...?
+
 		var minLenOpt = opts.minLength - 0;
 		var sortHandler = opts.forceObfuscation ? sortCharsForced : sortChars;
 
@@ -205,7 +240,9 @@ function scrambleTextNode(t){
 			// console.log("NOISY NOISY NOISE!@!!!")
 			if( t[textNodeBackupProp].substr(0,11) == 'webscramble' ){
 				// already scrambled???? (maybe only 90% sure...)
-				return; // ruins unscramble featuere... for sites that will change our value? (maybe they reset the text but leave alt intact...)
+				if( t[textNodeBackupProp] != 'webscramble::'+t.nodeValue ){
+					return; // ruins unscramble featuere... for sites that will change our value? (maybe they reset the text but leave alt intact...)
+				}
 			}
 		}
 
@@ -259,14 +296,18 @@ function scrambleImage(i){
 		//console.log('webscrambler:: canceled scramble operation due to hover detected...');
 		return;
 	}
+	if( !i.getAttribute('webscramblerorigprops') ){
+		i.setAttribute("webscramblerorigprops",JSON.stringify(getCssPropsWeModify(i, imageCssPropsWeModify)));
+	}
 	i.style.opacity=0.1;
 	i.style.filter='brightness(0.4)';
 }
 
 function unscrambleImage(i){
 	// odd bug, if we are hovered and mutate again.... the image is scrambled again... annoying virtual doms!
-	i.style.opacity='';
+	i.style.opacity='1'; // dislike this, but it seems little other way... '' works on most sites...
 	i.style.filter='';
+	resetOrigionalProperties(i, imageCssPropsWeModify);
 }
 
 function applyForChildNodes(parent, fnApply){
@@ -307,9 +348,9 @@ function bodyMouseOver(e){
 
 	//console.log('webscramber::mmouseovervent', e)
 
-	 // if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
-		// processNodes(e.target.querySelectorAll(imageLikeNodesSelector), 'modeIsUnscramble', 'isHover'); // event mode only.... 
-	 // }
+	 if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
+		processNodes(e.target.querySelectorAll(imageLikeNodesSelector), 'modeIsUnscramble', 'isHover'); // event mode only.... 
+	 }
 }
 function bodyMouseOut(e){
 	if(!active) return; // todo: remove listeners instead?
@@ -317,9 +358,9 @@ function bodyMouseOut(e){
 
 	//console.log('webscramber::mmouseoutevent', e)
 
-	// if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
-	// 	processNodes(e.target.querySelectorAll(imageLikeNodesSelector), null); // event mode only.... 
-	// }
+	if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
+		processNodes(e.target.querySelectorAll(imageLikeNodesSelector), null); // event mode only.... 
+	}
 }
 
 // deprecated, use above
@@ -330,6 +371,11 @@ function hoverImage(e){
 function unhoverImage(e){
 	scrambleImage(e.target);
 }
+
+// function atterAdjusted(e){
+// 	if(!active) return;
+// 	console.log('webscrambler::attrsadjusted', e)
+// }
 
 function nodeInserted(e){
 	if(!active) return;
@@ -352,18 +398,20 @@ function checkDocBody(){
 function docBodyReady(){
 	setTimeout(function(){
 		observer.observe(document.body, { attributes: false, childList: true, subtree: true });
+		// attrObserver.observe(document.body, { attributes: true });
 		processNodes(document.body.querySelectorAll('*'));
 	}, 0);
-
 	document.body.addEventListener('mouseover', bodyMouseOver, true);
+	document.body.addEventListener('mousemove', bodyMouseOver, true);
 	document.body.addEventListener('mouseout', bodyMouseOut, true);
 }
 
 observer = new MutationObserver(nodeInserted)
+//attrObserver = new MutationObserver(atterAdjusted) // seems to fire, but alos miss some modifiations, so it doesn't work!
 //checkDocBody()
 
 var opts = {};
 loadPrefsFromStorage(opts, function(){
-	console.log('webscrambler::prefs', opts)
+	//console.log('webscrambler::prefs', opts)
 	checkDocBody()
 });
