@@ -11,6 +11,7 @@ pOptions["obfuscateMode"]={def:'reverse-words',ind:0,name:'Text Obfuscation Mode
 pOptions["sortAlgo"]={def:'default',ind:1,name:'Letter Sort Algo',select:{'default':'Default','standard':'Standard (Alpha Sort)','standardReversed':'Standard Reversed','caseInsensitive':'Case Insnsitive (Alpha Sort)','caseInsensitiveReversed':'Case Insnsitive Reversed','random':"Random"}};
 pOptions["forceObfuscation"]={def:false,ind:1,name:'When sort obfuscation fails; *randomize'};
 pOptions["minLength"]={def:'3',ind:0,name:'Minimum Word Length',select:{'1':'1 Character','2':'2 Characters','3':'3 Characters','4':'4 Characters','5':"5 Characters"}};
+pOptions["exclusions"]={def:'',ind:0,name:'Exclusions Regex',help:'about!'};
 
 
 function iloadPref(results, i, obj, pOptions){
@@ -36,4 +37,8 @@ function loadPrefsFromLocalStorage(results, cbf, override){
 	for(i in pAdvOptions){iloadPref(results, i, override || {}, pAdvOptions);}
 	for(i in pSyncItems){iloadPref(results, i, override || {}, pSyncItems);}
 	if(typeof(cbf)=='function')cbf();
+}
+
+function siteExclusionMatched(hostname,optsExclusions){
+	return hostname.match(new RegExp('^('+optsExclusions+')$','i'));
 }

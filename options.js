@@ -211,7 +211,7 @@ function createOptions(piOptions, elemAppend){
 			cb.setAttribute('id',i);cb.setAttribute('size',(piOptions[i].def + '').length);
 			if(piOptions[i].ind>0)l.appendChild(document.createTextNode('\u00a0\u00a0\u00a0\u00a0'));
 			l.appendChild(cb);
-			l.appendChild(document.createTextNode(piOptions[i].name));
+			l.appendChild(document.createTextNode(' '+piOptions[i].name + ' '));
 			
 			elemAppend.appendChild(l);
 			//document.getElementById('bsave').parentNode.insertBefore(l,document.getElementById('bsave'));
@@ -219,6 +219,8 @@ function createOptions(piOptions, elemAppend){
 		}
 	}
 }
+
+var opts={};
 
 function init(){
 
@@ -232,7 +234,15 @@ function init(){
 	
 	createOptions(pOptions, document.getElementById('options'));
 	createOptions(pAdvOptions, document.getElementById('adv_options'))
-	restore_options();
+
+	loadPrefsFromStorage(opts, function(){
+		//console.log('webscrambler::prefs', opts)
+		for( var i in opts ){
+			localStorage[i] = opts[i];
+		}
+		restore_options();
+	});
+
 	
 	
 	

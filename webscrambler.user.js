@@ -13,9 +13,9 @@ var scrambleTextLC = scrambleText.toLowerCase()
 var mutationList = [];
 
 var active=true;
+var siteDisabled=false;
 
 var imageCssPropsWeModify={'opacity':'o', 'filter':'f' }; // still doesnt' work if opacity is dynaically set along the way (say, once image loads)... we may need to observe attribute modifications to the DOM too!
-
 
 function getCssPropsWeModify(node, propsList){
 	var robj={};
@@ -48,16 +48,22 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 	}else if(request.restoreViewportNodes){
 		restoreVpNodes();
 	}else if(request.disableScan){
-		if( active==false ){
+		if( active==false && ! request.onlyDisable ){
 			active=true;
 			checkForNodes()
 		}else{
-			restoreAllNodes();
+			if(siteDisabled){
+				reActivate();
+				return;
+			}else{
+				restoreAllNodes();
 			active=false;
+			}
 		}
 	}else{
 		console.log('webscrambler::unhandled message', request);
 	}
+	sendResponse({});
 });
 
 function restoreAllNodes(){
@@ -228,7 +234,8 @@ function scrambleTextNode(t){
 
 		//t.nodeValue = t.nodeValue.replace(/\w/ig, scrambleText)
 
-		if( t.nodeValue.substr(0,1) == '$' ) return; // TODO: new cateogry of exclusions for currency values where obfuscation is downright awesomely annoying... configure regex for additional exclusions...?
+		//if( t.nodeValue.substr(0,1) == '$' ) return; // TODO: new cateogry of exclusions for currency values where obfuscation is downright awesomely annoying... configure regex for additional exclusions...?
+		// solved below using A-z instead of \w
 
 		var minLenOpt = opts.minLength - 0;
 		var sortHandler = opts.forceObfuscation ? sortCharsForced : sortChars;
@@ -252,14 +259,14 @@ function scrambleTextNode(t){
 			t.nodeValue = t.nodeValue.replace(/[a-z]+/g, function(v){return v.length > minLenOpt ? sortHandler(v) : v;})
 
 		}else if( opts.obfuscateMode == 'sort-words' ){
-			t.nodeValue = t.nodeValue.replace(/\w+/g, function(v){return v.length > minLenOpt ? sortHandler(v) : v;})
+			t.nodeValue = t.nodeValue.replace(/[A-z]+/g, function(v){return v.length > minLenOpt ? sortHandler(v) : v;})
 
 		}else if( opts.obfuscateMode == 'reverse-cases' ){
 			t.nodeValue = t.nodeValue.replace(/[A-Z]+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
 			t.nodeValue = t.nodeValue.replace(/[a-z]+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
 
 		}else /*if( opts.obfuscateMode == 'reverse-words' )*/{
-			t.nodeValue = t.nodeValue.replace(/\w+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
+			t.nodeValue = t.nodeValue.replace(/[A-z]+/g, function(v){return v.length > minLenOpt ? reverseChars(v) : v;})
 		}
 
 		// if( opts.forceObfuscation ){
@@ -389,10 +396,29 @@ function nodeInserted(e){
 
 function checkDocBody(){
 	if( document.body ){
+
+
+		// we may move the "disable" code someplace wehre it is more easy re-activate???
+
+		if( siteExclusionMatched(window.location.hostname, opts.exclusions) ){
+			console.warn("webscrambler::disabed for site - check preferences to reactivate!");
+			siteDisabled = true;
+			return;
+		}
+
 		docBodyReady()
+
+
 	}else{
 		setTimeout(checkDocBody, 50);
 	}
+}
+
+function reActivate(){
+	if( siteDisabled ){
+		docBodyReady();
+	}
+	siteDisabled = false;
 }
 
 function docBodyReady(){
