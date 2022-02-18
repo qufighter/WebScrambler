@@ -1,8 +1,6 @@
-var tabid=0,winid=0,topz=100;
-var scaleFactor = 0.2;
+var tabid=0;
 var isFirefox = window.navigator.userAgent.indexOf('Firefox') > -1;
 var fixedSizePopup = isFirefox;
-var constrainToWindow = true; // todo - make option (keep video within window during move/resize)
 var tabhostname = '';
 
 function _ge(g){

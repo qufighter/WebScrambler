@@ -49,6 +49,12 @@
 
 	<br/><br/><b>Minimum Word Length</b> To preserve short words like 'the' enter 3
 
+	<br/><br/><b>Host Exclusions Regex</b> Literally <pre>window.location.hostname</pre> where the resulting string is inserted /^(HERE)$/i and the use of alternation | may allow listing multiples.  Auto configured with button in popup on each site visited.<br/><br/>You may hit mulitple subdomains using something like <pre>[\w\.]*google.com|[\w\.]*facebook.com</pre>
+
+	You can test with the function itself!
+
+	<pre id="place-code"></pre>
+	<pre>siteExclusionMatched('google.com', '[\w\.]*google.com|[\w\.]*facebook.com')</pre>
 </div>
 </div>
 
@@ -76,7 +82,7 @@
 
 </div>
 
-<!-- Rate or share <span id="ratings-container"></span> Video Sticky Tape!
+<!-- Rate or share <span id="ratings-container"></span> WebScrambler
  -->
 </body>
 </html>

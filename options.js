@@ -284,6 +284,8 @@ document.addEventListener('DOMContentLoaded', function () {
 	if(window.location.hash=='#help'){
 		toggle_next_sibling_display({target:document.getElementById('shohelp')})
 	}
+
+	document.getElementById('place-code').innerText = siteExclusionMatched.toString();
 	
 	createAndAttachRatings(document.getElementById('ratings-container'));
 

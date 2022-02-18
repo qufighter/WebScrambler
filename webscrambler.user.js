@@ -355,8 +355,12 @@ function bodyMouseOver(e){
 
 	//console.log('webscramber::mmouseovervent', e)
 
+	// sometimes the siblings (before or after target) COVER the same thing/area...
+	// so WE COULD check if siblings overlap... or really we could check the whole hirearchy upwards for overlaps!!!!!
+
 	 if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
-		processNodes(e.target.querySelectorAll(imageLikeNodesSelector), 'modeIsUnscramble', 'isHover'); // event mode only.... 
+		processNodes(e.target.querySelectorAll('*'), 'modeIsUnscramble', 'isHover'); // event mode only.... 
+		// formerly * was imageLikeNodesSelector
 	 }
 }
 function bodyMouseOut(e){
@@ -366,7 +370,8 @@ function bodyMouseOut(e){
 	//console.log('webscramber::mmouseoutevent', e)
 
 	if( e.target.querySelectorAll && e.target.nodeName == 'A' ){ // HOVER EVENTS HERE DO NOT PROPAGAT TO CHILD (IMAGES)... ETC??
-		processNodes(e.target.querySelectorAll(imageLikeNodesSelector), null); // event mode only.... 
+		processNodes(e.target.querySelectorAll('*'), null); // event mode only.... 
+		// formerly * was imageLikeNodesSelector
 	}
 }
 
