@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 				return;
 			}else{
 				restoreAllNodes();
-			active=false;
+				active=false;
 			}
 		}
 	}else{
@@ -73,6 +73,7 @@ function restoreAllNodes(){
 		nodes[i].removeAttribute('web-scrambler-hover');
 		unscrambleNode(nodes[i], null);
 	}
+	queueForScrambleAtDeselect=[];
 }
 function restoreVpNodes(){
 	var nodes=document.body.querySelectorAll('*');
@@ -84,6 +85,7 @@ function restoreVpNodes(){
 			nodes[i].setAttribute('web-scrambler-skip', 'on') // TODO: fix so that this does not impact TOP LEVEL NODES (eg nodes that contain the entire viewport area), temp fix was to remove +rect.width etc above... could use "predominantly in vp" calc... or maybe require vp height is > than element height
 		}
 	}
+	queueForScrambleAtDeselect=[];
 }
 
 function checkForNodes(){
@@ -227,6 +229,9 @@ var sortAlgos = {
 }
 
 function scrambleTextNode(t){
+
+	if( isNodeSelectedAndShouldRemainUnscrambled(t) ){ return; }
+
 	// many possible obfucscation strategies and preferences may be added here later... scrambleText is not availble currently though!  plus using random text messes up font printing, using existing text is better...
 	//var tl = t.nodeValue.length;
 	//if( tl > 3 ){ // short words filter...
@@ -336,8 +341,19 @@ function unscrambleNode(n, isHover, processChildNodes){
 	}
 }
 
+function isNodeSelectedAndShouldRemainUnscrambled(n){
+	var s = window.getSelection();
+	if( s.baseNode == n || s.anchorNode == n || s.extentNode == n || s.focusNode == n || s.containsNode(n) ){	// todo: check will base and anchor always be the same?  willl extent and focus always be the same?  if so remove double checks...
+		queueForScrambleAtDeselect.push(n);
+		return true;
+	}
+	return false;
+}
+
 function scrambleNode(n, isUnHover, processChildNodes){
-	if( nodeOrAnyParentDoNotRecurseInto(n) ) return;
+	if( nodeOrAnyParentDoNotRecurseInto(n) ){ return; }
+
+	if( isNodeSelectedAndShouldRemainUnscrambled(n) ){ return; }
 
 	if( isImageLikeNode(n) ){
 		n.removeAttribute('web-scrambler-hover');
@@ -363,8 +379,12 @@ function bodyMouseOver(e){
 		// formerly * was imageLikeNodesSelector
 	 }
 }
+
+var queueForScrambleAtDeselect = [];
+
 function bodyMouseOut(e){
 	if(!active) return; // todo: remove listeners instead?
+
 	scrambleNode(e.target, 'isUnHover');
 
 	//console.log('webscramber::mmouseoutevent', e)
@@ -373,6 +393,12 @@ function bodyMouseOut(e){
 		processNodes(e.target.querySelectorAll('*'), null); // event mode only.... 
 		// formerly * was imageLikeNodesSelector
 	}
+}
+
+function selChange(){
+	processNodes(queueForScrambleAtDeselect, null);
+	queueForScrambleAtDeselect = [];
+	// todo: consider: unscramble selected nodes?
 }
 
 // deprecated, use above
@@ -435,6 +461,7 @@ function docBodyReady(){
 	document.body.addEventListener('mouseover', bodyMouseOver, true);
 	document.body.addEventListener('mousemove', bodyMouseOver, true);
 	document.body.addEventListener('mouseout', bodyMouseOut, true);
+	document.addEventListener('selectionchange', selChange);
 }
 
 observer = new MutationObserver(nodeInserted)
