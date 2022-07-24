@@ -11,8 +11,9 @@ pOptions["obfuscateMode"]={def:'reverse-words',ind:0,name:'Text Obfuscation Mode
 pOptions["sortAlgo"]={def:'default',ind:1,name:'Letter Sort Algo',select:{'default':'Default','standard':'Standard (Alpha Sort)','standardReversed':'Standard Reversed','caseInsensitive':'Case Insnsitive (Alpha Sort)','caseInsensitiveReversed':'Case Insnsitive Reversed','random':"Random"}};
 pOptions["forceObfuscation"]={def:false,ind:1,name:'When sort obfuscation fails; *randomize'};
 pOptions["minLength"]={def:'3',ind:0,name:'Minimum Word Length',select:{'1':'1 Character','2':'2 Characters','3':'3 Characters','4':'4 Characters','5':"5 Characters"}};
-pOptions["exclusions"]={def:'',ind:0,name:'Host Exclusions Regex',help:'about!'};
-
+pOptions["inclusions"]={def:'',ind:0,name:'Host Enable Regex',help:'about!'};
+pOptions["enableByDefault"]={def:true,ind:0,name:'Enable By Default',help:'about!'};
+pOptions["exclusions"]={def:'',ind:1,name:'Host Exclusions Regex',help:'about!'};
 
 function iloadPref(results, i, obj, pOptions){
 	if(typeof(pOptions[i].def)=='boolean'){
@@ -39,6 +40,12 @@ function loadPrefsFromLocalStorage(results, cbf, override){
 	if(typeof(cbf)=='function')cbf();
 }
 
+function siteMatched(hostname,pattern){
+    return hostname.match(new RegExp('^('+pattern+')$','i'));
+}
 function siteExclusionMatched(hostname,optsExclusions){
-	return hostname.match(new RegExp('^('+optsExclusions+')$','i'));
+	return siteMatched(hostname,optsExclusions);
+}
+function siteInclusionMatched(hostname,optsInclusions){
+    return siteMatched(hostname,optsInclusions);
 }

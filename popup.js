@@ -2,6 +2,7 @@ var tabid=0;
 var isFirefox = window.navigator.userAgent.indexOf('Firefox') > -1;
 var fixedSizePopup = isFirefox;
 var tabhostname = '';
+var opts = {};
 
 function _ge(g){
 	return document.getElementById(g);
@@ -44,18 +45,32 @@ function disable(){
 }
 function toggleDisableSite(e){
 
-	var excludedSite = siteExclusionMatched(tabhostname,opts.exclusions);
+    var exclusionStatus = exclusionInfo();
+    
+	var excludedSite = exclusionStatus.excludedSite;
+    excludedSite = !excludedSite;
 
 	var tossave={};
-	tossave.exclusions = opts.exclusions.replace(tabhostname, '');
-	if( ! excludedSite ){
-		tossave.exclusions += '|'+tabhostname;
-	}
-	excludedSite = !excludedSite
-	e.target.innerText = exlusionText(excludedSite)
-
-	tossave.exclusions = tossave.exclusions.replace(/^(\|)+/, '').replace(/(\|)+/g, '|');
-
+    if ( opts.enableByDefault ){
+        tossave.exclusions = opts.exclusions.replace(tabhostname, '');
+        if( excludedSite ){
+            tossave.exclusions += '|'+tabhostname;
+        }
+    }else{
+        tossave.inclusions = opts.inclusions.replace(tabhostname, '');
+        if( !excludedSite ){
+            tossave.inclusions += '|'+tabhostname;
+        }
+    }
+	
+	e.target.innerText = exclusionText(excludedSite);
+    
+    if ( opts.enableByDefault ){
+        tossave.exclusions = tossave.exclusions.replace(/^(\|)+/, '').replace(/(\|)+/g, '|');
+    }else{
+        tossave.inclusions = tossave.inclusions.replace(/^(\|)+/, '').replace(/(\|)+/g, '|');
+    }
+    
 	console.log(tossave);
 
 	storage.set(tossave, function() {
@@ -65,27 +80,43 @@ function toggleDisableSite(e){
 			console.log(chrome.runtime.lastError);
 		}
 		chrome.tabs.sendMessage(tabid,{disableScan: true, onlyDisable: excludedSite},function(r){ });
-		opts.exclusions = tossave.exclusions;
+        if ( opts.enableByDefault ){
+            opts.exclusions = tossave.exclusions;
+        }else{
+            opts.inclusions = tossave.inclusions;
+        }
+        
 	});
 
 }
 
-function exlusionText(excludedSite){
-	return (excludedSite ? 'Enable' : 'Disable')+' for Site (always)'
+function exclusionText(exclusionBool){
+    return (exclusionBool ? 'Enable' : 'Disable')+' for Site (always)';
+}
+
+function exclusionInfo(){
+    var exclusionBool = false;
+    if( !opts.enableByDefault ){
+        exclusionBool = !siteMatched(tabhostname,opts.inclusions);
+    }else{
+        exclusionBool = siteMatched(tabhostname,opts.exclusions);
+    }
+    return {
+        label: exclusionText(exclusionBool),
+        excludedSite: exclusionBool
+    }
 }
 
 function iin(){
-	var excludedSite = siteExclusionMatched(tabhostname,opts.exclusions);
-
-	Cr.elm('div',{'id':'', childNodes: [
+    
+    Cr.elm('div',{'id':'', childNodes: [
 		Cr.elm('a', {'class': 'rowa', events:['click', restoreAll], childNodes:[Cr.txt('Reveal All Nodes 1x')]}),
 		Cr.elm('a', {'class': 'rowa', events:['click', restoreAllInViewport], childNodes:[Cr.txt('Restore Viewport Nodes')]}),
-		Cr.elm('a', {'class': 'rowa', events:['click', disable], childNodes:[Cr.txt('Disable(toggle,transient)')]}),
-		(tabhostname ? Cr.elm('a', {'class': 'rowa', events:['click', toggleDisableSite], childNodes:[Cr.txt(exlusionText(excludedSite))]}) : 0)
+		Cr.elm('a', {'class': 'rowa', events:['click', disable], childNodes:[Cr.txt((!opts.enableByDefault ? 'Enable' : 'Disable')+'(toggle,transient)')]}),
+		(tabhostname ? Cr.elm('a', {'class': 'rowa', events:['click', toggleDisableSite], childNodes:[Cr.txt(exclusionInfo().label)]}) : 0)
 	]},_ge('ve'));
 }
 
-var opts = {};
 
 document.addEventListener('DOMContentLoaded', function () {
 

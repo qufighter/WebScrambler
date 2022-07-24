@@ -431,12 +431,26 @@ function checkDocBody(){
 
 		// we may move the "disable" code someplace wehre it is more easy re-activate???
 
-		if( siteExclusionMatched(window.location.hostname, opts.exclusions) ){
-			console.warn("webscrambler::disabed for site - check preferences to reactivate!");
-			siteDisabled = true;
-			return;
-		}
+        if( opts.enableByDefault ){
+        
+            if( siteMatched(window.location.hostname, opts.exclusions) ){
+                console.warn("webscrambler::disabed for site - check preferences to reactivate!");
+                siteDisabled = true;
+            }
+        }else{
+            siteDisabled = true;
+            console.warn("webscrambler::disabled by default!" , window.location.hostname );
 
+            if( siteMatched(window.location.hostname, opts.inclusions) ){
+                console.warn("webscrambler::enabled for site - check preferences to change the default!");
+                siteDisabled = false;
+            }
+        }
+
+        if( siteDisabled ){
+            return;
+        }
+        
 		docBodyReady()
 
 

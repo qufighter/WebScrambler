@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		toggle_next_sibling_display({target:document.getElementById('shohelp')})
 	}
 
-	document.getElementById('place-code').innerText = siteExclusionMatched.toString();
+	document.getElementById('place-code').innerText = siteMatched.toString();
 	
 	createAndAttachRatings(document.getElementById('ratings-container'));
 
